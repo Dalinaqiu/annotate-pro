@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --muted-foreground: #64748b;
+}
+
+body {
+  min-height: 100vh;
+  background-color: #f9fafb;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+.text-muted-foreground {
+  color: var(--muted-foreground);
+}
