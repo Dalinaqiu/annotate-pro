@@ -10,6 +10,9 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         <p className="text-sm text-muted-foreground">
           Tabs for tasks, members, and settings will mount here.
         </p>
+        <div className="mt-3">
+          <a href={`/project/${params.id}/tasks`} className="text-sm underline">Open Tasks</a>
+        </div>
       </header>
     </main>
   );

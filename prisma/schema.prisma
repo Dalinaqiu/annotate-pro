@@ -144,10 +144,10 @@ model ProjectMember {
   roleId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id])
-  
+
   @@unique([userId, projectId])
   @@index([userId])
   @@index([projectId])
@@ -183,10 +183,249 @@ model Comment {
   resolved  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
   @@index([taskId])
   @@map("comments")
+}
+
+// -------------------------
+// 数据管理（2.4）相关模型
+// -------------------------
+
+// 项目（最小定义，供数据集关联）
+model Project {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  archivedAt  DateTime?
+
+  datasets    Dataset[]
+  members     ProjectMember[]
+
+  @@map("projects")
+}
+
+// 数据集
+model Dataset {
+  id          String       @id @default(cuid())
+  projectId   String
+  name        String
+  type        DatasetType
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items       DataItem[]
+  importJobs  ImportJob[]
+  filters     SavedFilter[]
+  reports     QualityReport[]
+
+  @@index([projectId])
+  @@unique([projectId, name])
+  @@map("datasets")
+}
+
+// 数据项
+model DataItem {
+  id         String        @id @default(cuid())
+  datasetId  String
+  sourceUri  String        // 源地址：s3://, r2://, https://, file:// 等
+  mimeType   String?
+  checksum   String?       // 去重/完整性
+  status     DataItemStatus @default(NEW)
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  dataset    Dataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([status])
+  @@index([checksum])
+  @@map("data_items")
+}
+
+enum DatasetType {
+  IMAGE
+  TEXT
+  AUDIO
+  VIDEO
+  MULTIMODAL
+}
+
+enum ImportType {
+  LOCAL_UPLOAD
+  CLOUD_SYNC
+  URL_LIST
+  PREANNOTATION
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum DataItemStatus {
+  NEW
+  IMPORTED
+  PROCESSED
+  FAILED
+}
+
+// 导入/同步任务
+model ImportJob {
+  id         String     @id @default(cuid())
+  datasetId  String
+  type       ImportType
+  status     JobStatus  @default(PENDING)
+  progress   Int        @default(0) // 0-100
+  params     Json       // 任务参数：源、路径、映射等
+  error      String?
+  createdAt  DateTime   @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  dataset    Dataset    @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([status])
+  @@map("import_jobs")
+}
+
+// 质量报告
+model QualityReport {
+  id        String   @id @default(cuid())
+  datasetId String
+  score     Float
+  summary   Json     // 指标与检查结果明细
+  createdAt DateTime @default(now())
+
+  dataset   Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@map("quality_reports")
+}
+
+// 已保存的筛选器
+model SavedFilter {
+  id        String   @id @default(cuid())
+  datasetId String
+  userId    String
+  name      String
+  query     Json     // 保存的查询条件
+  createdAt DateTime @default(now())
+
+  dataset   Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, userId, name])
+  @@index([datasetId])
+  @@index([userId])
+  @@map("saved_filters")
+}
+
+// -------------------------
+// 任务管理（2.5）相关模型
+// -------------------------
+
+model Task {
+  id            String      @id @default(cuid())
+  projectId     String
+  datasetId     String
+  dataItemId    String
+  title         String
+  status        TaskStatus  @default(PENDING)
+  priority      TaskPriority @default(MEDIUM)
+  assignedToId  String?
+  assignedAt    DateTime?
+  dueAt         DateTime?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dataset       Dataset     @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  dataItem      DataItem    @relation(fields: [dataItemId], references: [id], onDelete: Cascade)
+  assignee      User?       @relation(fields: [assignedToId], references: [id])
+  events        TaskEvent[]
+  comments      Comment[]
+
+  @@index([projectId])
+  @@index([datasetId])
+  @@index([dataItemId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model TaskEvent {
+  id        String     @id @default(cuid())
+  taskId    String
+  type      String     // CREATED, STATUS_CHANGED, ASSIGNED, UNASSIGNED, RETRY, DELETED
+  from      String?
+  to        String?
+  details   Json?
+  actorId   String?
+  createdAt DateTime   @default(now())
+
+  task      Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor     User?      @relation(fields: [actorId], references: [id])
+
+  @@index([taskId])
+  @@index([actorId])
+  @@map("task_events")
+}
+
+enum TaskStatus {
+  PENDING        // 待标注
+  IN_PROGRESS    // 进行中
+  DONE           // 已完成
+  TO_REVIEW      // 待审核
+  APPROVED       // 审核通过
+  REJECTED       // 驳回
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// -------------------------
+// 标注结果（2.6）
+// -------------------------
+
+model Annotation {
+  id        String    @id @default(cuid())
+  taskId    String
+  userId    String
+  type      String    // image.boxes, image.polygons, text.ner, etc
+  payload   Json      // 标注数据
+  status    AnnotationStatus @default(DRAFT)
+  version   Int       @default(1)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([status])
+  @@map("annotations")
+}
+
+enum AnnotationStatus {
+  DRAFT
+  SAVED
+  SUBMITTED
 }

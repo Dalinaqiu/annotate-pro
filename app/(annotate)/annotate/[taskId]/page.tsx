@@ -1,16 +1,25 @@
-interface AnnotatePageProps {
-  params: { taskId: string };
-}
+import { getTaskWithItem } from "@/server/repositories/tasks";
+import { AnnotateShell } from "@/components/annotate/AnnotateShell";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/server/auth";
 
-export default function AnnotateTaskPage({ params }: AnnotatePageProps) {
+interface AnnotatePageProps { params: { taskId: string } }
+
+export default async function AnnotateTaskPage({ params }: AnnotatePageProps) {
+  const [task, session] = await Promise.all([
+    getTaskWithItem(params.taskId),
+    getServerSession(authOptions as any),
+  ]);
   return (
     <main className="flex h-screen flex-col">
-      <header className="border-b p-4">
-        <h1 className="text-lg font-medium">Annotating task {params.taskId}</h1>
-        <p className="text-sm text-muted-foreground">
-          Canvas, toolbars, and collaboration sidebar will mount in this layout.
-        </p>
-      </header>
+      <div className="flex-1">
+        <AnnotateShell
+          taskId={params.taskId}
+          userId={(session?.user as any)?.id ?? null}
+          sourceUri={task?.dataItem?.sourceUri ?? undefined}
+          mimeType={task?.dataItem?.mimeType ?? undefined}
+        />
+      </div>
     </main>
   );
 }
