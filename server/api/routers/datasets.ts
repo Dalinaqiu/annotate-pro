@@ -8,7 +8,7 @@ const filterSchema = z.object({
   text: z.string().optional(),
   labels: z.array(z.string()).optional(),
   annotators: z.array(z.string()).optional(),
-  status: z.array(z.enum(["NEW", "IMPORTED", "PROCESSED", "FAILED")).optional(),
+  status: z.array(z.enum(["NEW", "IMPORTED", "PROCESSED", "FAILED"])).optional(),
   timeFrom: z.string().datetime().optional(),
   timeTo: z.string().datetime().optional(),
 });

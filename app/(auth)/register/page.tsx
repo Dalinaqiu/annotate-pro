@@ -34,8 +34,9 @@ export default function RegisterPage() {
       const response = await fetch("/api/trpc/auth.register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // tRPC fetch adapter expects top-level `input`
         body: JSON.stringify({
-          json: {
+          input: {
             email,
             password,
             name: name || undefined,
